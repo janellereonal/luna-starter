@@ -13,6 +13,7 @@ Luna runs on **your own Claude account** (Pro or Max) through Claude Code. No AP
 - **Proactive.** Check-ins, routines ("every weekday at 7:30, brief me"), deadline radar, a tap when someone messages you.
 - **Safe.** An independent checker (Sentinel) asks before anything risky: payments, deleting, posting publicly, sharing files, bulk sends. Every action is logged.
 - **Make her yours.** Pick any picture or GIF and she scans it, finds the face, eyes, mouth, arms and legs, and brings it to life (blinks, talks, walks, waves, dances). Or a 3D model (.glb).
+- **Share characters.** Tap **share** on any character to save it as one small `.lunachar` file (picture, scan and animation). Friends add it with **+ add character** and it's ready, no rescan.
 - **Claude-style app.** Light and dark mode, a full-screen window, a little chat by your character, voice typing.
 
 ## Install (Mac)

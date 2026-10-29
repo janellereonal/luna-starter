@@ -1043,10 +1043,11 @@ ipcMain.handle('checkin:now', () => { pulse(true); return true; });
 ipcMain.handle('activity:get', () => { try { return fs.readFileSync(path.join(__dirname, 'me', 'activity.md'), 'utf8').split('\n').filter(Boolean).slice(-300).reverse(); } catch (_) { return []; } });
 // characters
 ipcMain.handle('char:pick', async () => {
-  const r = await dialog.showOpenDialog(settingsWin, { title: 'Pick a character (a picture, or a 3D model)', properties: ['openFile'], filters: [{ name: 'Pictures and 3D models', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'glb', 'vrm'] }] });
+  const r = await dialog.showOpenDialog(settingsWin, { title: 'Pick a character (a picture, a 3D model, or a shared .lunachar file)', properties: ['openFile'], filters: [{ name: 'Pictures and 3D models', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'glb', 'vrm', 'lunachar'] }] });
   if (r.canceled || !r.filePaths[0]) return null;
   const f = r.filePaths[0]; const ext = path.extname(f).slice(1).toLowerCase().replace('jpg', 'jpeg');
   const name = path.basename(f).replace(/\.[^.]+$/, '');
+  if (ext === PACK_EXT) { try { const n = importCharacter(f); return { kind: 'imported', name: n, state: settingsState() }; } catch (e) { return { error: e.message }; } }
   if (ext === 'glb' || ext === 'vrm') {
     if (fs.statSync(f).size > 60 * 1024 * 1024) return { error: 'that model is over 60 MB. try a lighter version (under 20 MB works best).' };
     return { name, kind: '3d', glb: fs.readFileSync(f).toString('base64') };
@@ -1101,6 +1102,51 @@ ipcMain.handle('char:delete', (_e, id) => {
   }
   return settingsState();
 });
+// share a character: one small file with the picture, its scan and its animation, so a friend's luna can use it with no rescan
+const PACK_EXT = 'lunachar';
+const PACK_PARTS = ['.png', '.json', '.thumb.png', '.back.png', '.anim.png', '.anim.json', '.glb'];
+function exportCharacter(id) {
+  if (!charId(id)) throw new Error('pick one of your own characters to share');
+  const stem = id.replace(/\.(png|glb)$/, ''), files = {};
+  for (const ext of PACK_PARTS) { const f = path.join(CHARS, stem + ext); if (fs.existsSync(f)) files[ext] = fs.readFileSync(f).toString('base64'); }
+  if (!files['.png'] && !files['.glb']) throw new Error('that character is missing its picture');
+  return JSON.stringify({ format: 'luna-character', v: 1, name: stem.replace(/-/g, ' '), files });
+}
+function importCharacter(file) {
+  if (fs.statSync(file).size > 80 * 1024 * 1024) throw new Error('that character file is too big');
+  let pack; try { pack = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) { throw new Error("that isn't a luna character file"); }
+  if (!pack || pack.format !== 'luna-character' || !pack.files || typeof pack.files !== 'object') throw new Error("that isn't a luna character file");
+  const main = pack.files['.png'] ? '.png' : pack.files['.glb'] ? '.glb' : null;
+  if (!main) throw new Error('that character file has no picture in it');
+  const buf = {};
+  for (const [ext, b64] of Object.entries(pack.files)) {
+    if (!PACK_PARTS.includes(ext) || typeof b64 !== 'string') continue;
+    const b = Buffer.from(b64, 'base64');
+    if (ext.endsWith('.png') && b.slice(0, 8).toString('hex') !== '89504e470d0a1a0a') throw new Error('that character file looks damaged');
+    if (ext.endsWith('.json')) { try { JSON.parse(b.toString('utf8')); } catch (_) { continue; } }
+    if (ext === '.glb' && b.slice(0, 4).toString() !== 'glTF') throw new Error('that character file looks damaged');
+    buf[ext] = b;
+  }
+  if (main === '.glb' && buf['.png']) delete buf['.png'];
+  fs.mkdirSync(CHARS, { recursive: true });
+  const base = String(pack.name || path.basename(file).replace(/\.[^.]+$/, '')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'buddy';
+  let stem = base, i = 2;
+  while (PACK_PARTS.some((ext) => fs.existsSync(path.join(CHARS, stem + ext)))) stem = `${base}-${i++}`;
+  for (const [ext, b] of Object.entries(buf)) fs.writeFileSync(path.join(CHARS, stem + ext), b);
+  prefs.character = { type: main === '.glb' ? '3d' : 'image', file: stem + main, name: stem.replace(/-/g, ' ') };
+  savePrefs(); send('character', characterInfo());
+  return stem.replace(/-/g, ' ');
+}
+ipcMain.handle('char:export', async (_e, id) => {
+  try {
+    const data = exportCharacter(id);
+    const r = await dialog.showSaveDialog(settingsWin, { title: 'Share this character', defaultPath: path.join(app.getPath('desktop'), id.replace(/\.(png|glb)$/, '') + '.' + PACK_EXT), filters: [{ name: 'Luna character', extensions: [PACK_EXT] }] });
+    if (r.canceled || !r.filePath) return { ok: false };
+    fs.writeFileSync(r.filePath, data); shell.showItemInFolder(r.filePath);
+    return { ok: true, file: r.filePath, kb: Math.round(Buffer.byteLength(data) / 1024) };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
 // mac permissions shortcuts
 ipcMain.handle('open:pane', (_e, pane) => {
   const panes = { accessibility: 'Privacy_Accessibility', screen: 'Privacy_ScreenCapture', automation: 'Privacy_Automation', disk: 'Privacy_AllFiles', mic: 'Privacy_Microphone' };

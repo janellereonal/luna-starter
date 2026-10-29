@@ -77,15 +77,16 @@
       d.innerHTML = (c.type === 'gecko' ? '<div class="emoji">🦎</div>' : c.dataUrl ? `<img src="${c.dataUrl}">` : '<div class="emoji">🧸</div>') +
         `<div class="n">${esc(c.name)}</div>` + (c.type === '3d' ? '<span class="tag">3D</span>' : c.type === 'image' ? '<span class="tag">2D</span>' : '') +
         (c.id !== 'gecko' ? '<button class="x" title="delete">×</button>' : '') +
-        (c.type === 'image' ? '<div style="margin-top:6px"><button class="btn" data-edit style="padding:3px 8px;font-size:12px">edit parts</button></div>' : '');
+        (c.id !== 'gecko' ? '<div style="margin-top:6px;display:flex;gap:4px;justify-content:center">' + (c.type === 'image' ? '<button class="btn" data-edit style="padding:3px 8px;font-size:12px">edit parts</button>' : '') + '<button class="btn" data-share title="save as one file you can send to a friend" style="padding:3px 8px;font-size:12px">share</button></div>' : '');
       d.onclick = async (e) => {
         if (e.target.closest('.x')) { if (confirm(`delete ${c.name}?`)) { st = await S.charDelete(c.id); renderChars(); } return; }
+        if (e.target.closest('[data-share]')) { const r = await S.charExport(c.id); if (r && r.error) alert(r.error); else if (r && r.ok) alert(`saved ${c.name} as one file (${r.kb} KB). send it to a friend, and they add it in their Luna with + add character. no rescan needed.`); return; }
         if (e.target.closest('[data-edit]')) { openEditor({ id: c.id, name: c.name, dataUrl: c.dataUrl, rig: c.rig, animUrl: c.animUrl, anim: c.anim }); return; }
         st = await S.charUse(c.id); renderChars();
       };
       $('chars').appendChild(d);
     }
-    const add = document.createElement('div'); add.className = 'char add'; add.innerHTML = '<div style="font-size:28px">+</div><div class="n">add character<br><span style="font-size:11px">picture or .glb</span></div>';
+    const add = document.createElement('div'); add.className = 'char add'; add.innerHTML = '<div style="font-size:28px">+</div><div class="n">add character<br><span style="font-size:11px">picture, .glb or shared file</span></div>';
     add.onclick = addCharacter;
     $('chars').appendChild(add);
   }
@@ -106,6 +107,7 @@
     const f = await S.charPick();
     if (!f) return;
     if (f.error) { alert(f.error); return; }
+    if (f.kind === 'imported') { st = f.state; renderChars(); alert(`${f.name} is here and ready to go 🎉`); return; }
     if (f.kind === '3d') return open3D(f);
     // an animated picture (gif) keeps all its frames: her own blink, wiggle and moves
     const an = await BuddyCore.decodeAnimated(f.dataUrl);
