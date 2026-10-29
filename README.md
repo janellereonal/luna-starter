@@ -75,6 +75,10 @@ WhatsApp: Luna links as a linked device using an unofficial library. It's your o
 
 Prefer GPT, Gemini, OpenRouter or a local model (Ollama)? Settings → Brain. Claude gets the most features.
 
+## Make it yours
+
+See [CUSTOMIZE.md](CUSTOMIZE.md): where every instruction, rule and setting lives. For the code, see [HOW-I-WORK.md](HOW-I-WORK.md).
+
 ## License
 
 MIT
