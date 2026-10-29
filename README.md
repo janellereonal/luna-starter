@@ -14,7 +14,25 @@ Luna runs on **your own Claude account** (Pro or Max) through Claude Code. No AP
 - **Safe.** An independent checker (Sentinel) asks before anything risky: payments, deleting, posting publicly, sharing files, bulk sends. Every action is logged.
 - **Make her yours.** Pick any picture or GIF and she scans it, finds the face, eyes, mouth, arms and legs, and brings it to life (blinks, talks, walks, waves, dances). Or a 3D model (.glb).
 - **Share characters.** Tap **share** on any character to save it as one small `.lunachar` file (picture, scan and animation). Friends add it with **+ add character** and it's ready, no rescan.
+- **On your phone too.** Message yourself on WhatsApp and Luna answers in that chat, even voice notes and photos. Reply with a number to pick one of her suggestions. Only your own self-chat can give her instructions.
+- **Has a soul.** Her personality and values live in `me/soul.md`, in her own words, and she grows it over time (and tells you when she does). She follows up on the things that matter ("how did the pitch go?").
+- **Safety check-up.** One tap checks for open network doors, readable login files, approvals switched off, small easy-to-trick models, and private files in git. It fixes file permissions itself.
 - **Claude-style app.** Light and dark mode, a full-screen window, a little chat by your character, voice typing.
+
+## Built with agentic engineering
+
+Luna can change her own code. Ask her for a feature ("add a pomodoro timer", "make the chat bubble bigger") and she rebuilds herself, the way a careful engineer would rather than by vibe coding:
+
+1. **She knows herself.** Every session she's told her version, her model, her folder and her skills. `HOW-I-WORK.md` is her map of her own code.
+2. **You approve first.** A tap on the approve card starts it. A message or a web page alone can't make her rewrite herself.
+3. **She snapshots everything** (the last 5 snapshots are kept).
+4. **A separate engineering session (Opus) makes the change.** It reads the code, makes the smallest change in the existing style, adds a test, runs the local checks, then asks itself *"now that it's built, what would I refactor?"* and updates the docs.
+5. **The app checks the work itself.** The checks run again in a fresh process, and the safety files must be byte-for-byte unchanged. If anything fails, everything goes back automatically.
+6. **One tap to restart, see what changed, or undo.** The history is in `me/self-changes.md`.
+
+She also **writes skills for herself**. When she figures out something she'll need again, she saves it as a small tested script plus a one-line description. Only the one-liners sit in her context, so it stays fast as she learns.
+
+Run the checks yourself any time with `npm run check` (syntax, the code map, 20+ tests), or run `npm run doctor` for the safety check-up.
 
 ## Install (Mac)
 

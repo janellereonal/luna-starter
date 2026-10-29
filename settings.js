@@ -395,7 +395,23 @@
     $('waUnlink').classList.toggle('hidden', !w.linked && w.status !== 'needs-scan');
     $('waUnlink').textContent = w.linked ? 'Unlink' : 'Cancel';
     seg('waNotify', w.notify || P().waNotify || 'direct', (v) => set('waNotify', v));
+    $('waPhone').checked = w.phone !== false;
   }
+  $('waPhone').onchange = () => set('waPhone', $('waPhone').checked);
+  // ---------- safety check-up ----------
+  $('docRun').onclick = async () => {
+    $('docRun').disabled = true;
+    const r = await S.doctor();
+    $('docRun').disabled = false;
+    $('docScore').textContent = 'Safety: ' + r.score + (r.fixed && r.fixed.length ? ` (tightened ${r.fixed.length} file permission${r.fixed.length > 1 ? 's' : ''})` : '');
+    const icon = { ok: '✓', warn: '!', bad: '✗', info: '·' }, color = { ok: 'var(--ok, #3E7B4F)', warn: '#B7791F', bad: '#C0392B', info: 'inherit' };
+    $('docList').innerHTML = '';
+    for (const i of r.items) {
+      const row = document.createElement('div'); row.className = 'row';
+      row.innerHTML = `<div class="txt"><div class="t"><span style="color:${color[i.level]};font-weight:700;margin-right:6px">${icon[i.level]}</span>${esc(i.title)}</div><div class="d">${esc(i.detail)}</div></div>`;
+      $('docList').appendChild(row);
+    }
+  };
   $('waLink').onclick = async () => { $('waLink').disabled = true; paintWa(await S.waLink()); $('waLink').disabled = false; };
   $('waUnlink').onclick = async () => { if (confirm('unlink luna from your whatsapp?')) paintWa(await S.waUnlink()); };
   S.onWa && S.onWa(paintWa);

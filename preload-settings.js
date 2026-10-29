@@ -13,6 +13,6 @@ contextBridge.exposeInMainWorld('S', {
   onTheme: (fn) => ipcRenderer.on('theme', (_e, t) => fn(t)),
   setupStatus: inv('setup:status'), setupRefresh: inv('setup:refresh'), setupSignin: inv('setup:signin'), setupCopy: inv('setup:copyFromClaude'), setupPaste: inv('setup:pasteMemory'), setupBridge: inv('setup:bridge'), setupExport: inv('setup:export'), setupLearn: inv('setup:learn'),
   onSetup: (fn) => ipcRenderer.on('setup', (_e, s) => fn(s)),
-  waState: inv('wa:state'), waLink: inv('wa:link'), waUnlink: inv('wa:unlink'),
+  waState: inv('wa:state'), doctor: inv('doctor:run'), waLink: inv('wa:link'), waUnlink: inv('wa:unlink'),
   onWa: (fn) => ipcRenderer.on('wa', (_e, w) => fn(w))
 });

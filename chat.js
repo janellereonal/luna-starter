@@ -88,7 +88,7 @@
       b.textContent = a.label;
       b.addEventListener('click', () => {
         if (String(a.prompt).startsWith('__open__')) { bridge.openPath && bridge.openPath(a.prompt.slice(8)); return; }
-        box.querySelectorAll('button').forEach((x) => (x.disabled = true)); ask(a.prompt);
+        box.querySelectorAll('button').forEach((x) => (x.disabled = true)); ask(a.prompt, String(a.prompt).startsWith('__self__') ? a.label : undefined);
       });
       box.appendChild(b);
     }
@@ -190,12 +190,13 @@
   });
   if (bridge.onStatus) bridge.onStatus((t) => { if (live && !liveText) live.textContent = t; });
 
-  async function ask(text) {
+  // shown: what the chat displays when the real prompt is an internal command (like __self__restart)
+  async function ask(text, shown) {
     text = text.trim();
     if (!text || busy) return;
     busy = true; send.textContent = 'stop'; send.classList.add('stop');
-    add('me', text);
-    bridge.record && bridge.record({ who: 'me', text });
+    add('me', shown || text);
+    bridge.record && bridge.record({ who: 'me', text: shown || text });
     updateHello();
     document.querySelector('.chips').hidden = true;
     input.value = '';

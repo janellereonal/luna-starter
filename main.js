@@ -4,6 +4,14 @@ const { app, BrowserWindow, ipcMain, screen, Menu, Tray, powerMonitor, globalSho
 const connect = require('./lib/connect');
 const { makeAgent, listModels, PROVIDERS } = require('./lib/agent');
 const { createWA } = require('./lib/wa');
+const { parseTags, toPlain } = require('./lib/tags');
+const { routineDue } = require('./lib/schedule');
+const charpack = require('./lib/charpack');
+const improve = require('./lib/improve');
+const skills = require('./lib/skills');
+const doctor = require('./lib/doctor');
+const phone = require('./lib/phone');
+const { transcribe } = require('./lib/voice');
 const crypto = require('crypto');
 const http = require('http');
 const { spawn, execFileSync } = require('child_process');
@@ -144,6 +152,8 @@ function menuTemplate() {
     { label: 'proactive check-ins', type: 'checkbox', checked: prefs.proactive, click: (m) => { prefs.proactive = m.checked; savePrefs(); refreshTray(); } },
     { label: 'check in every', submenu: [15, 30, 60].map((n) => ({ label: n + ' min', type: 'radio', checked: prefs.pulseMin === n, click: () => { prefs.pulseMin = n; savePrefs(); } })) },
     { label: 'check in now', click: () => pulse(true) },
+    { label: 'safety check-up', click: () => runDoctor(true) },
+    { label: 'undo my last self-change', enabled: improve.listSnapshots(__dirname).length > 0 && !improving, click: () => undoSelf() },
     { label: 'sync memory with claude now', click: brainSync },
     { type: 'separator' },
     { label: 'new chat', click: () => { stopBrain(); sessionId = null; startBrain(); } },
@@ -169,7 +179,7 @@ let prefs = { model: 'sonnet', servers: null, roam: 'both', proactive: true, pul
   provider: 'claude-code', providers: {}, secrets: {}, userName: '', charName: 'luna', charIcon: '🦎', character: { type: 'gecko' }, charScale: 1,
   quietFrom: 22, quietTo: 4, reminders: null, hotkey: 'Alt+Space', onboarded: false,
   theme: { mode: 'system', style: 'luna', accent: '#3E7B4F', bubble: '#F6D77A', font: 'default', size: 'normal' }, work: '', personalPrefs: '',
-  effort: 'low', waNotify: 'direct', bgBrowser: false };
+  effort: 'low', waNotify: 'direct', bgBrowser: false, waPhone: true, improveModel: 'opus' };
 try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(PREFS, 'utf8')) }; } catch (_) {}
 const savePrefs = () => { try { fs.writeFileSync(PREFS, JSON.stringify(prefs)); } catch (_) {} };
 // default daily reminders (editable in settings)
@@ -199,7 +209,9 @@ const SKIP_SERVERS = /remote-devices/i; // claude-in-chrome stays: it's how she 
 function allowedTools() {
   const base = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'mcp__luna', 'mcp__canvas', 'mcp__browser',
     'Bash(osascript tools/send-whatsapp.applescript:*)', 'Bash(osascript tools/mac.applescript:*)',
-    'Bash(tools/look.sh)', 'Bash(tools/wa-recent.sh:*)', 'Bash(open -a:*)', 'Bash(open https://:*)', 'Bash(open http://:*)'];
+    'Bash(tools/look.sh)', 'Bash(tools/wa-recent.sh:*)', 'Bash(open -a:*)', 'Bash(open https://:*)', 'Bash(open http://:*)',
+    // skills she wrote for herself (skills/<name>/...) and her own check-ups. sentinel still screens every command
+    'Bash(node skills/:*)', 'Bash(bash skills/:*)', 'Bash(python3 skills/:*)', 'Bash(node scripts/doctor.js)', 'Bash(node scripts/check.js)'];
   for (const sv of prefs.servers || []) base.push('mcp__' + sv);
   for (const t of prefs.desktopTools || []) base.push('mcp__' + t.name);
   return [...new Set(base)].join(',');
@@ -226,6 +238,15 @@ function mcpConfigs() {
   } catch (_) {}
   const out = files.length ? ['--mcp-config', ...files] : [];
   return out.concat(sentinelArgs(), trustArgs());
+}
+// she knows what she is: her app, her code, her brain, her skills (so she can explain, debug and improve herself)
+function selfAware() {
+  let v = ''; try { v = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8')).version; } catch (_) {}
+  const sk = skills.skillLines(__dirname);
+  return [`About you: you are ${charName()} v${v}, a desktop agent app (Electron) running from ${__dirname} on ${who()}'s Mac. Your brain right now: Claude Code, model ${prefs.model}, effort ${prefs.effort || 'low'}.`,
+    `Your own source code is in this folder; HOW-I-WORK.md maps it. During a chat you can read your code but not edit it. To change yourself (a new feature, a fix, a different look or behavior), end your reply with [[improve: short title | exactly what to change and why]]. It runs a careful engineering session with a snapshot, tests and one-tap undo, after ${who()} approves.`,
+    `Your personality and values are in me/soul.md (read it). You may refine it over time, but always tell ${who()} when you do.`,
+    sk ? `Skills you wrote for yourself:\n${sk}` : `You have no saved skills yet. When you work out how to do something you'll need again, save it as a skill (see skills/make-a-skill/SKILL.md).`].join('\n');
 }
 const LOCKED = ['Write(./tools/**)', 'Edit(./tools/**)', 'Write(./main.js)', 'Edit(./main.js)', 'Write(./CLAUDE.md)', 'Edit(./CLAUDE.md)', 'Write(./me/activity.md)', 'Edit(./me/activity.md)'].join(',');
 // ---------- sentinel: fixed safety rules + approve/deny cards + activity log ----------
@@ -313,10 +334,10 @@ function onLine(line) {
   if (j.type === 'stream_event') {
     const e = j.event;
     if (e && e.type === 'content_block_delta' && e.delta && e.delta.type === 'text_delta') {
-      if (pending.sawTool) { pending.sawTool = false; send('delta', '\n\n'); pending.acc += '\n\n'; }
-      send('delta', e.delta.text); pending.acc += e.delta.text;
+      if (pending.sawTool) { pending.sawTool = false; if (!pending.silent) send('delta', '\n\n'); pending.acc += '\n\n'; }
+      if (!pending.silent) send('delta', e.delta.text); pending.acc += e.delta.text;
     }
-    if (e && e.type === 'content_block_start' && e.content_block && e.content_block.type === 'tool_use') { pending.sawTool = true; send('status', 'checking...'); }
+    if (e && e.type === 'content_block_start' && e.content_block && e.content_block.type === 'tool_use') { pending.sawTool = true; if (!pending.silent) send('status', 'checking...'); }
   } else if (j.type === 'assistant' && j.message && Array.isArray(j.message.content)) {
     const t = j.message.content.filter((c) => c.type === 'text').map((c) => c.text).join('');
     if (t) pending.lastText = t;
@@ -383,10 +404,16 @@ function finishTurn(res) {
 
 ipcMain.handle('reset', () => { stopBrain(); sessionId = null; agentHistory = []; transcript = []; for (const w of [win, chatWin]) if (w && !w.isDestroyed()) w.webContents.send('chat:clear'); });
 ipcMain.handle('stop', () => { if (pending) { const keep = (pending.lastText || pending.acc).trim(); if (isClaude()) sessionDirty = true; stopBrain(); finishTurn({ ok: true, text: (keep ? keep + '\n\n' : '') + '(stopped)' }); } });
-ipcMain.handle('ask', (_e, text) => new Promise((resolve) => {
-  if (pending) { resolve({ ok: false, text: 'one sec, still answering!' }); return; }
+ipcMain.handle('ask', (_e, text) => {
+  const self = String(text).match(/^__self__(\w+)(?::(.*))?$/); // buttons on self-improvement messages
+  if (self) return selfAction(self[1], self[2]);
+  return askLuna(text);
+});
+// one turn with luna. silent = it came from somewhere else (her phone), so don't stream into the desktop bubble
+function askLuna(text, { silent = false } = {}) { return new Promise((resolve) => {
+  if (pending) { resolve({ ok: false, busy: true, text: 'one sec, still answering!' }); return; }
   if (!isClaude()) {
-    pending = { resolve, sawTool: false, text, acc: '', lastText: '' };
+    pending = { resolve, sawTool: false, text, acc: '', lastText: '', silent };
     agentAbort = new AbortController();
     agent.turn(agentHistory, text, { signal: agentAbort.signal })
       .then((t) => finishTurn({ ok: true, text: t || '(no reply)' }))
@@ -398,12 +425,12 @@ ipcMain.handle('ask', (_e, text) => new Promise((resolve) => {
     resolve({ ok: false, text: "i can't find claude code on this mac. install it (settings > brain shows how) or pick another model in settings > brain." });
     return;
   }
-  pending = { resolve, sawTool: false, text, acc: '', lastText: '', resumed: false, retried: false };
+  pending = { resolve, sawTool: false, text, acc: '', lastText: '', resumed: false, retried: false, silent };
   // after a stop (or a broken turn) the old session can be left half-finished, so start fresh with the recent chat as context
   if (sessionDirty) { sessionDirty = false; sessionId = null; pending.withContext = true; }
   runClaudeTurn();
   turnTimer = setTimeout(() => { stopBrain(); }, 240000);
-}));
+}); }
 
 let sessionDirty = false;
 const NOISE = /permissions\.allow|has not been trusted|trust dialog|hasTrustDialogAccepted|no stdin data received|redirect stdin|proceeding without it/i;
@@ -415,7 +442,7 @@ function runClaudeTurn() {
   const p0 = pending; if (!p0) return;
   const prompt = p0.withContext ? contextPrompt(p0.text) : p0.text;
   const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-    '--model', prefs.model, '--effort', prefs.effort || 'low', '--chrome', '--allowedTools', allowedTools(), '--disallowedTools', LOCKED, ...mcpConfigs()];
+    '--model', prefs.model, '--effort', prefs.effort || 'low', '--chrome', '--allowedTools', allowedTools(), '--disallowedTools', LOCKED, '--append-system-prompt', selfAware(), ...mcpConfigs()];
   if (sessionId) { args.push('--resume', sessionId); p0.resumed = true; } else p0.resumed = false;
   const child = spawn(claudeBin, args, { cwd: __dirname, env: baseEnv(), stdio: ['ignore', 'pipe', 'pipe'] }); // no API key: always your Pro login
   brain = child; buf = '';
@@ -481,7 +508,7 @@ function runBackground(prompt, { model = 'sonnet', quick = false, timeoutMs = 24
   if (!claudeBin) return { done: Promise.reject(new Error('claude code not found')), cancel() {} };
   const args = quick
     ? ['-p', prompt, '--output-format', 'json', '--model', 'haiku', '--no-session-persistence', '--tools', '', '--strict-mcp-config']
-    : ['-p', prompt, '--output-format', 'json', '--model', model, '--no-session-persistence', '--chrome', '--allowedTools', allowedTools(), '--disallowedTools', LOCKED, ...mcpConfigs()];
+    : ['-p', prompt, '--output-format', 'json', '--model', model, '--no-session-persistence', '--chrome', '--allowedTools', allowedTools(), '--disallowedTools', LOCKED, '--append-system-prompt', selfAware(), ...mcpConfigs()];
   const child = spawn(claudeBin, args, { cwd: __dirname, env: baseEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   const kill = setTimeout(() => child.kill(), timeoutMs);
@@ -571,25 +598,12 @@ ipcMain.on('open-file', (_e, f) => {
 });
 
 // ---------- routines (recurring jobs, e.g. "mon 08:00", "daily 21:00", "weekdays 07:30", "every 3h") ----------
-const DAYS = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 function addRoutine(when, title, instructions) {
   prefs.routines = (prefs.routines || []).filter((r) => r.title.toLowerCase() !== title.toLowerCase());
   prefs.routines.push({ when: when.toLowerCase().trim(), title, instructions, last: '' });
   savePrefs(); refreshTray();
 }
 function removeRoutine(title) { prefs.routines = (prefs.routines || []).filter((r) => !r.title.toLowerCase().includes(title.toLowerCase().trim())); savePrefs(); refreshTray(); }
-function routineDue(r, n) {
-  const hm = `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`;
-  const ev = r.when.match(/every\s+(\d+)\s*h/);
-  if (ev) { const key = `${n.toDateString()}-${Math.floor(n.getHours() / Number(ev[1]))}`; return r.last !== key && n.getMinutes() < 2 ? key : null; }
-  const t = (r.when.match(/(\d{1,2}):(\d{2})/) || [])[0];
-  if (!t || t.padStart(5, '0') !== hm) return null;
-  const d = n.getDay(), w = r.when;
-  const dayOk = /daily|every ?day/.test(w) || (/weekdays/.test(w) && d >= 1 && d <= 5) || (/weekends/.test(w) && (d === 0 || d === 6)) ||
-    Object.entries(DAYS).some(([k, v]) => w.includes(k) && v === d);
-  const key = n.toDateString() + hm;
-  return dayOk && r.last !== key ? key : null;
-}
 setInterval(() => {
   const n = localNow();
   for (const r of prefs.routines || []) { const key = routineDue(r, n); if (key) { r.last = key; savePrefs(); startJob(r.title, r.instructions, true); } }
@@ -601,13 +615,14 @@ setInterval(() => {
 // something new, a quick haiku turn writes the reply and the whatsapp helper sends it.
 let watch = null; // { contact, until, notes, lastId, busy }
 function handleTags(text) {
-  const w = text.match(/\[\[watch:\s*([^|\]]+?)\s*(?:\|\s*(\d+)\s*)?(?:\|\s*([^\]]*?)\s*)?\]\]/i);
-  if (w) startWatch(w[1], Number(w[2] || 60), w[3] || '');
-  if (/\[\[unwatch\]\]/i.test(text)) stopWatch();
-  for (const m of text.matchAll(/\[\[job:\s*([^|\]]+?)\s*\|\s*([^\]]+?)\s*\]\]/gi)) startJob(m[1], m[2]);
-  for (const m of text.matchAll(/\[\[routine:\s*([^|\]]+?)\s*\|\s*([^|\]]+?)\s*\|\s*([^\]]+?)\s*\]\]/gi)) addRoutine(m[1], m[2], m[3]);
-  for (const m of text.matchAll(/\[\[unroutine:\s*([^\]]+?)\s*\]\]/gi)) removeRoutine(m[1]);
-  return text.replace(/\[\[(un)?watch[^\]]*\]\]|\[\[job:[^\]]*\]\]|\[\[(un)?routine:[^\]]*\]\]/gi, '').trim();
+  const t = parseTags(text);
+  if (t.watch) startWatch(t.watch.contact, t.watch.minutes, t.watch.notes);
+  if (t.unwatch) stopWatch();
+  for (const j of t.jobs) startJob(j.title, j.instructions);
+  for (const r of t.routines) addRoutine(r.when, r.title, r.instructions);
+  for (const r of t.unroutines) removeRoutine(r);
+  if (t.improve[0]) startImprove(t.improve[0].title, t.improve[0].details);
+  return t.clean;
 }
 function waRecent(contact, n) {
   return new Promise((resolve) => {
@@ -669,7 +684,8 @@ function pulse(force) {
   const now = new Date().toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   const prompt = `You are ${charName()} doing a quiet background check-in for ${who()}. It is ${now}.
 Read the files in me/ and notes.md. Then quickly check what you can reach: calendar (next 3 hours), school or work dues (next 48 hours), important unread email and chat mentions from the last few hours, and anything time-based in their routine or goals.
-Only nudge them if something genuinely needs attention or a clear next action would help right now. Don't repeat these recent nudges: ${JSON.stringify(prefs.recent.slice(-10))}.
+Also look at the recent part of me/chat-log.md: if they mentioned something significant that has now happened (an exam, a big meeting, a trip, a doctor visit, a launch, a hard conversation), a short warm follow-up ("how did the pitch go?") counts as worth a nudge, once.
+Only nudge them if something genuinely needs attention, a clear next action would help right now, or a follow-up like that is due. Don't repeat these recent nudges: ${JSON.stringify(prefs.recent.slice(-10))}.
 Do not send, post, edit or create anything. Read only.
 Reply with ONLY a JSON object, no other text:
 {"nudge": "<one short casual line, no em dashes, or empty string if nothing needs them>", "actions": [{"label": "<2-4 words>", "prompt": "<what to do if they tap it>"}]}
@@ -810,6 +826,7 @@ const wa = createWA({
   log: (l) => logActivity(l),
   onQr: (q) => { try { require('qrcode').toDataURL(q, { margin: 1, width: 280 }).then((u) => { waQrImage = u; sendSettings('wa', waState()); }); } catch (_) {} },
   onStatus: () => { if (wa && wa.state().status === 'connected') waQrImage = null; sendSettings('wa', waState()); },
+  onSelf: (m) => onPhone(m),
   onMessage: (m) => {
     // a new message for you: luna taps you (direct chats, or groups when you're mentioned)
     const mode = prefs.waNotify || 'direct';
@@ -823,7 +840,39 @@ const wa = createWA({
       { label: 'catch me up', prompt: `catch me up on my whatsapp chat with ${m.chatName}` }] });
   }
 });
-function waState() { const s = wa.state(); return { ...s, qrImage: s.status === 'needs-scan' ? waQrImage : null, linked: wa.linked(), notify: prefs.waNotify || 'direct' }; }
+function waState() { const s = wa.state(); return { ...s, qrImage: s.status === 'needs-scan' ? waQrImage : null, linked: wa.linked(), notify: prefs.waNotify || 'direct', phone: prefs.waPhone !== false }; }
+
+// ---------- luna on your phone: message yourself on whatsapp, she answers there (see lib/phone.js) ----------
+let phoneActions = [], phoneQueue = [], phoneBusy = false;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function onPhone(m) {
+  if (prefs.waPhone === false) return;
+  phoneQueue.push(m);
+  if (!phoneBusy) drainPhone().catch((e) => { phoneBusy = false; logActivity('phone chat error: ' + e.message); });
+}
+async function drainPhone() {
+  phoneBusy = true;
+  while (phoneQueue.length) {
+    const m = phoneQueue.shift();
+    let text = phone.pickAction(m.text, phoneActions) || m.text || '';
+    if (m.kind === 'voice') {
+      const heard = m.file ? await transcribe(m.file, { env: baseEnv(), openaiKey: getSecret('openai') }) : null;
+      text = heard ? `(voice note, transcribed) ${heard}` : `(${who()} sent a voice note${m.file ? ` saved at ${m.file}` : ''}. There's no speech-to-text set up on this Mac, so tell them in one line to type it, or to save an OpenAI key in settings > brain so you can listen to voice notes.)`;
+    } else if (m.kind === 'photo') text = `${text || 'what do you make of this?'}\n(they sent a photo: ${m.file || 'it failed to download'}. Look at it with the Read tool.)`;
+    else if (m.kind === 'file') text = `${text || 'here, a file'}\n(they sent a file${m.fileName ? ` "${m.fileName}"` : ''}: ${m.file || 'it failed to download'})`;
+    recordChat({ who: 'me', text: `📱 ${m.text || (m.kind === 'voice' ? '🎤 voice note' : m.kind === 'photo' ? '📷 photo' : '📎 file')}` });
+    const prompt = `(from ${who()}'s phone, on WhatsApp. They're away from the Mac: keep it short and plain, no cards or tables.)\n${text}`;
+    wa.typing(m.chat, true);
+    let res = { ok: false, text: '' };
+    for (let i = 0; i < 80; i++) { res = await askLuna(prompt, { silent: true }); if (!res.busy) break; await sleep(3000); } // wait for a desktop answer to finish
+    wa.typing(m.chat, false);
+    const plain = toPlain(res.text || '');
+    phoneActions = plain.actions;
+    recordChat({ who: 'luna', text: res.text || '' });
+    try { await wa.sendSelf(m.chat, plain.text || (res.ok ? 'done ✓' : 'my brain hiccuped, try again?')); } catch (e) { logActivity('phone reply failed: ' + e.message); }
+  }
+  phoneBusy = false;
+}
 ipcMain.handle('wa:state', () => waState());
 ipcMain.handle('setup:status', () => setupState());
 ipcMain.handle('setup:refresh', async () => { discoverServers(); return connectEverything(); });
@@ -989,7 +1038,7 @@ function settingsState() {
 }
 ipcMain.handle('settings:get', () => settingsState());
 ipcMain.handle('settings:set', (_e, key, value) => {
-  const allowed = ['userName', 'charName', 'charIcon', 'roam', 'autoSpeak', 'proactive', 'pulseMin', 'model', 'provider', 'quietFrom', 'quietTo', 'reminders', 'hotkey', 'onboarded', 'charScale', 'brainFileId', 'theme', 'work', 'personalPrefs', 'tapOpens', 'scanModel', 'effort', 'waNotify', 'bgBrowser'];
+  const allowed = ['userName', 'charName', 'charIcon', 'roam', 'autoSpeak', 'proactive', 'pulseMin', 'model', 'provider', 'quietFrom', 'quietTo', 'reminders', 'hotkey', 'onboarded', 'charScale', 'brainFileId', 'theme', 'work', 'personalPrefs', 'tapOpens', 'scanModel', 'effort', 'waNotify', 'bgBrowser', 'waPhone', 'improveModel'];
   if (key === 'providerConfig') { prefs.providers = prefs.providers || {}; prefs.providers[value.provider] = { ...(prefs.providers[value.provider] || {}), ...value.config }; savePrefs(); return settingsState(); }
   if (key === 'trust') { setTrust(value); return settingsState(); }
   if (key === 'login') { setLogin(Boolean(value)); return settingsState(); }
@@ -1102,62 +1151,125 @@ ipcMain.handle('char:delete', (_e, id) => {
   }
   return settingsState();
 });
-// share a character: one small file with the picture, its scan and its animation, so a friend's luna can use it with no rescan
-const PACK_EXT = 'lunachar';
-const PACK_PARTS = ['.png', '.json', '.thumb.png', '.back.png', '.anim.png', '.anim.json', '.glb'];
-function exportCharacter(id) {
-  if (!charId(id)) throw new Error('pick one of your own characters to share');
-  const stem = id.replace(/\.(png|glb)$/, ''), files = {};
-  for (const ext of PACK_PARTS) { const f = path.join(CHARS, stem + ext); if (fs.existsSync(f)) files[ext] = fs.readFileSync(f).toString('base64'); }
-  if (!files['.png'] && !files['.glb']) throw new Error('that character is missing its picture');
-  return JSON.stringify({ format: 'luna-character', v: 1, name: stem.replace(/-/g, ' '), files });
-}
+// share a character: one small .lunachar file (picture + scan + animation), see lib/charpack.js
+const PACK_EXT = charpack.EXT;
 function importCharacter(file) {
-  if (fs.statSync(file).size > 80 * 1024 * 1024) throw new Error('that character file is too big');
-  let pack; try { pack = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) { throw new Error("that isn't a luna character file"); }
-  if (!pack || pack.format !== 'luna-character' || !pack.files || typeof pack.files !== 'object') throw new Error("that isn't a luna character file");
-  const main = pack.files['.png'] ? '.png' : pack.files['.glb'] ? '.glb' : null;
-  if (!main) throw new Error('that character file has no picture in it');
-  const buf = {};
-  for (const [ext, b64] of Object.entries(pack.files)) {
-    if (!PACK_PARTS.includes(ext) || typeof b64 !== 'string') continue;
-    const b = Buffer.from(b64, 'base64');
-    if (ext.endsWith('.png') && b.slice(0, 8).toString('hex') !== '89504e470d0a1a0a') throw new Error('that character file looks damaged');
-    if (ext.endsWith('.json')) { try { JSON.parse(b.toString('utf8')); } catch (_) { continue; } }
-    if (ext === '.glb' && b.slice(0, 4).toString() !== 'glTF') throw new Error('that character file looks damaged');
-    buf[ext] = b;
-  }
-  if (main === '.glb' && buf['.png']) delete buf['.png'];
-  fs.mkdirSync(CHARS, { recursive: true });
-  const base = String(pack.name || path.basename(file).replace(/\.[^.]+$/, '')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'buddy';
-  let stem = base, i = 2;
-  while (PACK_PARTS.some((ext) => fs.existsSync(path.join(CHARS, stem + ext)))) stem = `${base}-${i++}`;
-  for (const [ext, b] of Object.entries(buf)) fs.writeFileSync(path.join(CHARS, stem + ext), b);
-  prefs.character = { type: main === '.glb' ? '3d' : 'image', file: stem + main, name: stem.replace(/-/g, ' ') };
+  const r = charpack.importPack(CHARS, file);
+  prefs.character = { type: r.type, file: r.file, name: r.stem.replace(/-/g, ' ') };
   savePrefs(); send('character', characterInfo());
-  return stem.replace(/-/g, ' ');
+  return r.stem.replace(/-/g, ' ');
 }
 ipcMain.handle('char:rename', (_e, id, name) => {
-  if (!charId(id)) return { error: "couldn't find that character" };
-  const stem = id.replace(/\.(png|glb)$/, ''), main = id.slice(stem.length);
-  const base = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
-  if (!base) return { error: 'use at least one letter or number in the name' };
-  if (base === stem) return settingsState();
-  let next = base, i = 2;
-  while (PACK_PARTS.some((ext) => fs.existsSync(path.join(CHARS, next + ext)))) next = `${base}-${i++}`;
-  for (const ext of PACK_PARTS) { const f = path.join(CHARS, stem + ext); if (fs.existsSync(f)) fs.renameSync(f, path.join(CHARS, next + ext)); }
-  if ((prefs.character || {}).file === id) { prefs.character = { ...prefs.character, file: next + main, name: next.replace(/-/g, ' ') }; savePrefs(); send('character', characterInfo()); }
-  return settingsState();
+  try {
+    const next = charpack.renameChar(CHARS, id, name);
+    if (next !== id && (prefs.character || {}).file === id) { prefs.character = { ...prefs.character, file: next, name: next.replace(/\.(png|glb)$/, '').replace(/-/g, ' ') }; savePrefs(); send('character', characterInfo()); }
+    return settingsState();
+  } catch (e) { return { error: e.message }; }
 });
 ipcMain.handle('char:export', async (_e, id) => {
   try {
-    const data = exportCharacter(id);
+    const data = charpack.exportPack(CHARS, id);
     const r = await dialog.showSaveDialog(settingsWin, { title: 'Share this character', defaultPath: path.join(app.getPath('desktop'), id.replace(/\.(png|glb)$/, '') + '.' + PACK_EXT), filters: [{ name: 'Luna character', extensions: [PACK_EXT] }] });
     if (r.canceled || !r.filePath) return { ok: false };
     fs.writeFileSync(r.filePath, data); shell.showItemInFolder(r.filePath);
     return { ok: true, file: r.filePath, kb: Math.round(Buffer.byteLength(data) / 1024) };
   } catch (e) { return { ok: false, error: e.message }; }
 });
+
+// ---------- luna improving herself: agentic engineering with a safety net (see lib/improve.js) ----------
+let improving = null;
+function runChecks() {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [path.join(__dirname, 'scripts', 'check.js')], { cwd: __dirname, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = ''; child.stdout.on('data', (d) => { out += d; }); child.stderr.on('data', (d) => { out += d; });
+    const kill = setTimeout(() => child.kill(), 180000);
+    child.on('close', (code) => { clearTimeout(kill); resolve({ ok: code === 0, out: out.slice(-3000) }); });
+    child.on('error', (e) => resolve({ ok: false, out: e.message }));
+  });
+}
+function selfLog(line) { try { fs.appendFileSync(path.join(__dirname, 'me', 'self-changes.md'), `- ${stamp()} | ${line}\n`); } catch (_) {} }
+async function startImprove(title, details) {
+  if (improving) { send('nudge', { text: `i'm already working on myself ("${improving.title}"). one change at a time!`, actions: [] }); return; }
+  if (!isClaude()) { send('nudge', { text: 'changing my own code needs the Claude brain (settings > brain)', actions: [] }); return; }
+  if (!claudeBin) claudeBin = findClaude();
+  if (!claudeBin) return;
+  improving = { title }; refreshTray();
+  const finish = (text, actions = []) => { improving = null; refreshTray(); send('nudge', { text, actions }); };
+  // an approval card every time (unless full trust mode is on): a message or web page alone can't make luna rewrite herself
+  const ok = await askApproval(`change my own code: ${title}`, 'self-improvement. i save a snapshot first, test the change, and you can undo it in one tap');
+  if (!ok) return finish(`ok, i won't change "${title}"`);
+  let snap; try { snap = improve.snapshot(__dirname, title); } catch (e) { return finish(`couldn't save a snapshot first (${e.message}), so i didn't touch anything`); }
+  send('nudge', { text: `working on myself: "${title}" 🛠️ i'll test it before keeping anything. keep chatting meanwhile`, actions: [] });
+  logActivity(`self-improvement started: ${title} (snapshot ${snap})`);
+  const deny = [...improve.GUARDED.flatMap((g) => [`Write(./${g})`, `Edit(./${g})`]), 'Write(./me/**)', 'Edit(./me/**)', 'Write(./.whatsapp/**)', 'Edit(./.whatsapp/**)', 'Write(./characters/**)', 'Edit(./characters/**)'].join(',');
+  const args = ['-p', improve.brief({ title, details, who: who(), name: charName() }), '--output-format', 'json', '--model', prefs.improveModel || 'opus', '--effort', 'medium', '--no-session-persistence',
+    '--allowedTools', 'Read,Write,Edit,Glob,Grep,WebSearch,WebFetch,Bash(node scripts/check.js),Bash(node --check:*)', '--disallowedTools', deny, ...sentinelArgs()];
+  const child = spawn(claudeBin, args, { cwd: __dirname, env: baseEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+  improving.child = child;
+  let out = ''; child.stdout.on('data', (d) => { out += d; });
+  const kill = setTimeout(() => child.kill(), 40 * 60000);
+  child.on('close', async () => {
+    clearTimeout(kill);
+    let summary = ''; try { const j = JSON.parse(out.slice(out.indexOf('{'))); summary = String(j.result || '').trim(); } catch (_) {}
+    const guard = improve.guardsIntact(__dirname, snap);
+    if (!guard.ok) { improve.restore(__dirname, snap); selfLog(`rolled back "${title}": touched ${guard.broken.join(', ')}`); return finish(`i tried to change my safety files (${guard.broken.join(', ')}), which isn't allowed, so i put everything back. nothing changed.`); }
+    const changed = improve.changes(__dirname, snap);
+    if (!changed.length) return finish(summary ? `${summary}\n\n(no code changed)` : `i couldn't find a safe way to do "${title}", nothing changed`);
+    const c = await runChecks();
+    if (!c.ok) {
+      improve.restore(__dirname, snap); selfLog(`rolled back "${title}": checks failed`);
+      return finish(`my change for "${title}" didn't pass my checks, so i put everything back. nothing changed.`, [{ label: 'try again', prompt: `improve yourself again: ${title}. ${details}. last time your checks failed with: ${c.out.replace(/\s+/g, ' ').slice(-400)}` }]);
+    }
+    const plus = changed.reduce((a, x) => a + x.plus, 0), minus = changed.reduce((a, x) => a + x.minus, 0);
+    selfLog(`"${title}": ${changed.map((x) => x.file).join(', ')} (+${plus} −${minus}), snapshot ${snap}`);
+    logActivity(`self-improvement kept: ${title} (${changed.length} files)`);
+    finish(`${summary || `done: ${title}`}\n\nchanged ${changed.length} file${changed.length > 1 ? 's' : ''} (+${plus} −${minus}), all my checks passed ✓ restart me to use it.`,
+      [{ label: 'restart now', prompt: '__self__restart' }, { label: 'what changed?', prompt: `__self__diff:${snap}` }, { label: 'undo it', prompt: `__self__undo:${snap}` }]);
+  });
+  child.on('error', (e) => { clearTimeout(kill); try { improve.restore(__dirname, snap); } catch (_) {} finish(`couldn't start working on myself: ${e.message}`); });
+}
+function undoSelf(id) {
+  const snaps = improve.listSnapshots(__dirname);
+  const target = id ? snaps.find((x) => x.id === id) : snaps[snaps.length - 1];
+  if (!target) { send('nudge', { text: 'there is nothing to undo', actions: [] }); return 'there is nothing to undo'; }
+  if (improving) { send('nudge', { text: 'wait for my current change to finish first', actions: [] }); return 'busy'; }
+  try { improve.snapshot(__dirname, `before undoing "${target.title}"`); } catch (_) {}
+  improve.restore(__dirname, target.id);
+  selfLog(`undid "${target.title}" (back to snapshot ${target.id})`);
+  const t = `undone: i'm back to how i was before "${target.title}". restart me to finish.`;
+  send('nudge', { text: t, actions: [{ label: 'restart now', prompt: '__self__restart' }] });
+  return t;
+}
+function selfAction(cmd, arg) {
+  if (cmd === 'restart') { setTimeout(() => { app.relaunch(); app.exit(0); }, 400); return Promise.resolve({ ok: true, text: 'restarting... 🦎' }); }
+  if (cmd === 'undo') return Promise.resolve({ ok: true, text: undoSelf(arg) });
+  if (cmd === 'diff') {
+    try {
+      const ch = improve.changes(__dirname, arg);
+      const list = ch.map((x) => `- ${x.file}: ${x.kind}${x.kind === 'changed' ? ` (+${x.plus} −${x.minus})` : ''}`).join('\n');
+      return Promise.resolve({ ok: true, text: ch.length ? `here's what's different from before that change:\n${list}\n\nthe full history is in me/self-changes.md` : 'nothing is different from that snapshot anymore' });
+    } catch (_) { return Promise.resolve({ ok: true, text: 'that snapshot is gone (i keep the last 5)' }); }
+  }
+  if (cmd === 'doctor') return Promise.resolve({ ok: true, text: runDoctor(false) });
+  return Promise.resolve({ ok: false, text: 'unknown action' });
+}
+
+// ---------- safety check-up (see lib/doctor.js) ----------
+function runDoctor(show) {
+  const fixed = doctor.fix(__dirname);
+  const r = doctor.audit(__dirname, prefs, { apiHost: (lunaApi.address() || {}).address, sentinelHook: fs.existsSync(path.join(__dirname, 'tools', 'sentinel-settings.json')) });
+  const text = doctor.report(r) + (fixed.length ? `\n✓ tightened permissions on: ${fixed.join(', ')}` : '');
+  if (show) send('nudge', { text, actions: [] });
+  return text;
+}
+ipcMain.handle('doctor:run', () => { const fixed = doctor.fix(__dirname); return { ...doctor.audit(__dirname, prefs, { apiHost: (lunaApi.address() || {}).address, sentinelHook: fs.existsSync(path.join(__dirname, 'tools', 'sentinel-settings.json')) }), fixed }; });
+
+// ---------- her soul: personality and values she can grow (me/soul.md, from templates/soul.md) ----------
+function ensureSoul() {
+  const f = path.join(__dirname, 'me', 'soul.md');
+  if (fs.existsSync(f)) return;
+  try { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, fs.readFileSync(path.join(__dirname, 'templates', 'soul.md'), 'utf8').replace(/\{\{name\}\}/g, charName()).replace(/\{\{human\}\}/g, prefs.userName || 'my human')); } catch (_) {}
+}
 
 // mac permissions shortcuts
 ipcMain.handle('open:pane', (_e, pane) => {
@@ -1192,6 +1304,7 @@ app.whenReady().then(() => {
   makeAppShortcut();
   startBrain();
   writeIdentity();
+  ensureSoul();
   applyTheme();
   if (wa.linked()) wa.start(); // reconnect luna's whatsapp line
   connectEverything().catch(() => {}); // their Claude login, Claude app tools and Claude Code memory

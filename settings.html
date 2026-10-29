@@ -170,6 +170,7 @@
         <div class="row stack hidden" id="waQrRow"><div class="d">On your phone: WhatsApp → Settings → Linked devices → Link a device, then scan this.</div><div class="check" style="height:300px"><img id="waQr" style="width:260px;height:260px;border-radius:8px;background:#fff"></div></div>
         <div class="row"><div class="btns"><button class="btn primary" id="waLink">Link WhatsApp</button><button class="btn danger hidden" id="waUnlink">Unlink</button></div></div>
         <div class="row"><div class="txt"><div class="t">Tell me when someone messages</div></div><div class="seg" id="waNotify"><button data-v="direct">Direct chats</button><button data-v="all">Everything</button><button data-v="off">Off</button></div></div>
+        <div class="row"><div class="txt"><div class="t">Chat with me from your phone</div><div class="d">Message yourself on WhatsApp (the "Message yourself" chat) and I answer there, even voice notes and photos. Only your own self-chat can give me instructions.</div></div><label class="toggle"><input type="checkbox" id="waPhone"><span></span></label></div>
       </div>
       <p class="note">Heads up: this uses WhatsApp's linked-device feature through an unofficial library (the same way many WhatsApp tools work). It's your own account and you can unlink any time, but WhatsApp doesn't officially support it, so there's a small risk they flag the account.</p>
       <h2>Mac apps (no setup)</h2>
@@ -231,6 +232,12 @@
         <div class="row"><div class="txt"><div class="t">Automation</div><div class="d">Controlling apps like WhatsApp and Notes.</div></div><button class="btn" data-pane="automation">Open</button></div>
         <div class="row"><div class="txt"><div class="t">Screen Recording</div><div class="d">Seeing the screen to check her work.</div></div><button class="btn" data-pane="screen">Open</button></div>
         <div class="row"><div class="txt"><div class="t">Microphone</div><div class="d">Voice typing.</div></div><button class="btn" data-pane="mic">Open</button></div>
+      </div>
+      <h2 style="margin-top:22px">Safety check-up</h2>
+      <p class="lede">Checks the things that get personal agents in trouble: open network doors, readable login files, approvals switched off, small easy-to-trick models, private files in git. It fixes file permissions on its own.</p>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t" id="docScore">Not run yet</div></div><button class="btn primary" id="docRun">Run check-up</button></div>
+        <div id="docList"></div>
       </div>
     </section>
 

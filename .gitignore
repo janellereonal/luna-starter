@@ -18,3 +18,6 @@ node_modules/
 *.v[0-9]*.js
 index.v1.html
 .DS_Store
+.luna-snapshots/
+skills/*
+!skills/make-a-skill/
