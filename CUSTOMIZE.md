@@ -18,7 +18,7 @@ The easiest way is to **ask Luna herself** ("make your replies shorter", "add a 
 | My own rules (work, school, people, nicknames) | add any `.md` file to `me/`, e.g. `me/my-rules.md`. She reads every file there |
 | Routines (morning brief, weekly review) | ask her, or the 🦎 menu → routines (saved in `.luna-prefs.json`) |
 | Proactive check-ins (how often, what she looks at) | 🦎 menu → check in every; the prompt is `pulse()` in `main.js` |
-| Daily little reminders (lunch, wind down) | Settings → General → reminders |
+| Daily little reminders (lunch, wind down) | `reminders` in `.luna-prefs.json` (`[{ "at": "12:30", "text": "lunch break? 🍱" }]`), or ask her for a routine instead |
 | Her look (character, size, walking, climbing) | Settings → Character (any picture, GIF or .glb), 🦎 menu for roaming |
 | Chat colors, dark mode, font | Settings → Appearance (theme in `.luna-prefs.json`, styles in `index.html`) |
 | Her brain (model, speed, other AI providers) | Settings → Brain, or 🦎 menu → quick / smart / genius brain |
