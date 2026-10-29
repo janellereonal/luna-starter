@@ -1,0 +1,254 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:">
+<title>Settings</title>
+<link rel="stylesheet" href="settings.css">
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><span id="brandIcon">🦎</span> <span id="brandName">luna</span></div>
+    <button data-go="welcome">✨ Get started</button>
+    <button data-go="general">General</button>
+    <button data-go="appearance">Appearance</button>
+    <button data-go="character">Character</button>
+    <button data-go="brain">Brain</button>
+    <button data-go="connections">Connections</button>
+    <button data-go="memory">Memory</button>
+    <button data-go="routines">Routines</button>
+    <button data-go="activity">Activity</button>
+    <button data-go="mac">Mac access</button>
+    <div class="grow"></div>
+    <button data-go="about">About</button>
+    <div class="foot" id="ver"></div>
+  </aside>
+  <main>
+    <!-- WELCOME: connect everything they already have -->
+    <section class="page" id="welcome">
+      <h1>Hi! I'm <span class="cn">luna</span> 👋</h1>
+      <p class="lede">Let's hook me up to your Claude so I know you and can work for you. Most of this happens on its own.</p>
+      <h2>1 · You</h2>
+      <div class="card"><div class="row"><div class="txt"><div class="t">What should I call you?</div></div><input type="text" id="wName" placeholder="your name"></div></div>
+
+      <h2>2 · Your Claude</h2>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">Claude account</div><div class="d" id="wClaudeD">Checking...</div></div><span class="pill off" id="wClaudeP">...</span><button class="btn hidden" id="wSignIn">Sign in</button><button class="btn hidden" id="wInstall">How to install</button></div>
+        <div class="row"><div class="txt"><div class="t">Apps from your Claude account</div><div class="d" id="wConnD">Gmail, Calendar, Drive and the rest you've connected on claude.ai come along automatically.</div></div><button class="btn" id="wConnMore">Connect more</button></div>
+        <div class="row"><div class="txt"><div class="t">Tools from your Claude app</div><div class="d" id="wToolsD">Anything you added to the Claude desktop app (like Canvas) works here too.</div></div><button class="btn" id="wRefresh">Check again</button></div>
+      </div>
+
+      <h2>3 · Your memory</h2>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">From Claude Code</div><div class="d" id="wCcD">Synced automatically.</div></div><span class="pill off" id="wCcP">none</span></div>
+        <div class="row stack"><div class="txt"><div class="t">Bring over your Claude memory</div><div class="d">Opens Claude with the question ready. Press enter, then copy Claude's answer. I'll grab it from your clipboard on my own.</div></div>
+          <div class="btns"><button class="btn primary" id="wCopy">Bring my Claude memory</button><span class="pill off" id="wMemP">not yet</span><span class="status" id="wMemS"></span></div>
+          <details><summary class="note">or paste it here</summary><textarea id="wPaste" placeholder="paste what Claude wrote"></textarea><div class="btns"><button class="btn" id="wPasteGo">Save</button></div></details></div>
+        <div class="row"><div class="txt"><div class="t">Put me inside the Claude app</div><div class="d" id="wBridgeD">Then in any Claude chat you can say "save everything you remember about me to luna", or "remind me every morning through luna". Restart the Claude app after turning this on.</div></div><label class="toggle"><input type="checkbox" id="wBridge"><span></span></label></div>
+        <div class="row"><div class="txt"><div class="t">Learn from your past Claude chats</div><div class="d">In Claude: Settings → Privacy → Export data. You'll get an email with a zip. Pick it here and I'll read it.</div></div><button class="btn" id="wExport">Pick the zip</button><span class="pill off" id="wExportP">no</span></div>
+      </div>
+
+      <h2>4 · Let me get to know you</h2>
+      <div class="card"><div class="row"><div class="txt"><div class="t">Look around (read only)</div><div class="d">I'll read your memory, calendar, email, school or work apps, chats and recent files, then write down who you are, your people, deadlines and projects. Nothing gets sent or changed.</div></div><button class="btn primary" id="wLearn">Start</button><span class="pill off" id="wLearnP">not yet</span></div></div>
+
+      <h2>5 · Make me yours</h2>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">Pick my look</div><div class="d">Any picture or GIF of a character.</div></div><button class="btn" data-goto="character">Character</button></div>
+        <div class="row"><div class="txt"><div class="t">Link WhatsApp, iMessage, email</div><div class="d">So I can message people and send files for you.</div></div><button class="btn" data-goto="connections">Connections</button></div>
+        <div class="row"><div class="txt"><div class="t">Mac access</div><div class="d">Lets me work in your apps.</div></div><button class="btn" data-goto="mac">Mac access</button></div>
+      </div>
+      <div class="btns" style="margin-top:18px"><button class="btn primary" id="wDone">All set!</button></div>
+    </section>
+
+    <!-- GENERAL: same profile fields as Claude's settings -->
+    <section class="page" id="general">
+      <h1>General</h1>
+      <p class="lede">The same profile questions Claude asks, so <span class="cn">luna</span> knows you the same way.</p>
+      <h2>Profile</h2>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">What should <span class="cn">luna</span> call you?</div></div><input type="text" id="userName" placeholder="your name"></div>
+        <div class="row"><div class="txt"><div class="t">What best describes your work?</div></div><input type="text" id="work" placeholder="student, marketing, engineering..."></div>
+        <div class="row stack"><div class="txt"><div class="t">Personal preferences</div><div class="d">How you want replies to sound. Paste what you wrote in Claude so both match.</div></div>
+          <textarea id="personalPrefs" placeholder="e.g. keep it casual and short. no em dashes."></textarea>
+          <div class="btns"><button class="btn" id="copyClaude">Open my Claude profile to copy it</button><span class="note" id="prefsSaved"></span></div></div>
+      </div>
+      <h2>Your buddy</h2>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">Name</div></div><input type="text" id="charName" placeholder="luna"></div>
+        <div class="row"><div class="txt"><div class="t">Icon</div><div class="d">Shows in the menu bar and chat.</div></div><input type="text" id="charIcon" style="width:70px;text-align:center" maxlength="4"></div>
+      </div>
+      <h2>Everyday</h2>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">Summon shortcut</div><div class="d">Brings her over with the chat open, from any app.</div></div><select id="hotkey"><option>Alt+Space</option><option>Control+Space</option><option>Alt+L</option><option>CommandOrControl+Shift+Space</option></select></div>
+        <div class="row"><div class="txt"><div class="t">Tapping her opens</div><div class="d">The little chat next to her, or her own full-screen window.</div></div><div class="seg" id="tapOpens"><button data-v="small">Little chat</button><button data-v="full">Full window</button></div></div>
+        <div class="row"><div class="txt"><div class="t">Open when my Mac starts</div></div><label class="toggle"><input type="checkbox" id="login"><span></span></label></div>
+        <div class="row"><div class="txt"><div class="t">Check in on her own</div><div class="d">Taps you with reminders and things she noticed.</div></div><label class="toggle"><input type="checkbox" id="proactive"><span></span></label></div>
+        <div class="row"><div class="txt"><div class="t">Quiet hours</div><div class="d">No check-ins in this window.</div></div><select id="quietFrom"></select> to <select id="quietTo"></select></div>
+      </div>
+    </section>
+
+    <!-- APPEARANCE -->
+    <section class="page" id="appearance">
+      <h1>Appearance</h1>
+      <p class="lede">How the chat looks. Pick the Claude look to make it feel like the Claude app.</p>
+      <h2>Color mode</h2>
+      <div class="card"><div class="row"><div class="txt"><div class="t">Mode</div><div class="d">System follows your Mac's light/dark setting (Claude's default too).</div></div>
+        <div class="seg" id="mode"><button data-v="system">System</button><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div></div>
+      <h2>Style</h2>
+      <div class="styles" id="styles">
+        <div class="sty" data-v="luna"><div class="mini" style="background:#FFFCF4"><i style="width:60%;background:#F1EBDC"></i><i style="width:45%;margin-left:auto;background:#F6D77A"></i><i style="width:30%;background:#3E7B4F"></i></div><div class="n">Luna (warm)</div></div>
+        <div class="sty" data-v="claude"><div class="mini" style="background:#FAF9F5"><i style="width:70%;background:#E5E3DA;height:6px;margin-top:3px"></i><i style="width:45%;margin-left:auto;background:#F0EEE6"></i><i style="width:30%;background:#C96442"></i></div><div class="n">Claude</div></div>
+        <div class="sty" data-v="custom"><div class="mini" id="customMini" style="background:#FFFCF4"><i style="width:60%;background:#F1EBDC"></i><i id="cmBubble" style="width:45%;margin-left:auto"></i><i id="cmAccent" style="width:30%"></i></div><div class="n">Custom</div></div>
+      </div>
+      <div class="card" id="customBox" style="margin-top:12px">
+        <div class="row"><div class="txt"><div class="t">Accent</div><div class="d">Buttons and highlights.</div></div><input type="color" id="accent"></div>
+        <div class="row"><div class="txt"><div class="t">Your message bubble</div></div><input type="color" id="bubble"></div>
+      </div>
+      <h2>Text</h2>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">Chat font</div></div><div class="seg" id="font"><button data-v="default">Default</button><button data-v="system">System</button><button data-v="serif">Serif replies</button><button data-v="readable">Easier to read</button></div></div>
+        <div class="row"><div class="txt"><div class="t">Text size</div></div><div class="seg" id="size"><button data-v="small">Small</button><button data-v="normal">Normal</button><button data-v="large">Large</button><button data-v="xl">Extra large</button></div></div>
+        <div class="row"><div class="txt"><div class="t">Read replies out loud</div></div><label class="toggle"><input type="checkbox" id="autoSpeak"><span></span></label></div>
+      </div>
+      <h2>On screen</h2>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">Where she hangs out</div></div><div class="seg" id="roam"><button data-v="floor">Floor</button><button data-v="both">Floor + walls</button><button data-v="wall">Walls</button></div></div>
+        <div class="row"><div class="txt"><div class="t">Character size</div></div><input type="range" id="charScale" min="0.6" max="1.6" step="0.05"></div>
+      </div>
+    </section>
+
+    <!-- CHARACTER -->
+    <section class="page" id="character">
+      <h1>Character</h1>
+      <p class="lede">Add a picture or a 3D model. <span class="cn">luna</span> scans it, finds the face, eyes, body, arms and legs, and makes it walk around your screen.</p>
+      <div class="grid" id="chars"></div>
+      <div id="scanner" class="hidden">
+        <h2 id="scanTitle">New character</h2>
+        <div class="card"><div class="row stack">
+          <div class="scan">
+            <div><div class="check" id="rigBox"><canvas id="rigCv"></canvas></div>
+              <div class="legend" style="margin-top:8px"><span><i style="background:#E5533D"></i>head</span><span><i style="background:#3E7BD9"></i>body</span><span><i style="background:#111"></i>eyes</span><span><i style="background:#E8C21D"></i>mouth</span><span><i style="background:#1FA463"></i>legs</span><span><i style="background:#E8912D"></i>arms</span><span><i style="background:#E05FA8"></i>ears</span><span><i style="background:#9B59D0"></i>tail</span></div></div>
+            <div class="live"><div class="check"><canvas id="liveCv"></canvas></div>
+              <div class="seg" id="liveMode" style="margin-top:8px"><button data-v="idle" class="on">Idle</button><button data-v="walk">Walk</button><button data-v="talk">Talk</button><button data-v="wave">Wave</button><button data-v="happy">Happy</button><button data-v="nap">Nap</button><button data-v="silly">Silly</button></div></div>
+          </div>
+          <div class="status" id="scanStatus"></div>
+          <div class="note" id="scanHelp">If something is off, drag the dots: big dot = where a part joins the body, small dot = its tip. Scroll over a limb to make it thicker or thinner. Double-click a dot to remove that part.</div>
+          <div class="btns" id="partBtns"><button class="btn" data-add="eyes">+ eye</button><button class="btn" data-add="mouth">+ mouth</button><button class="btn" data-add="legs">+ leg</button><button class="btn" data-add="arms">+ arm</button><button class="btn" data-add="ears">+ ear</button><button class="btn" data-add="tail">+ tail</button><button class="btn" id="rescan">Scan again</button></div>
+          <div class="row" style="padding:8px 0 0;border:0"><div class="txt"><div class="t">Which way she looks</div><div class="d">So she faces where she walks. Flip it if her head points backwards.</div></div><div class="seg" id="facing"><button data-v="left">← Left</button><button data-v="front">Front</button><button data-v="right">Right →</button></div></div>
+          <div class="row" style="padding:8px 0 0;border:0"><div class="txt"><div class="t">Name</div></div><input type="text" id="newName" placeholder="name"></div>
+          <div class="btns"><button class="btn primary" id="saveChar">Save and use</button><button class="btn" id="cancelChar">Cancel</button></div>
+        </div></div>
+      </div>
+      <p class="note">Tips: a full-body picture on a plain background works best (side view for animals, front view for people). Have a 2D character and want it in 3D? Make a .glb from your picture with a free image-to-3D tool, then add the .glb here.</p>
+    </section>
+
+    <!-- BRAIN -->
+    <section class="page" id="brain">
+      <h1>Brain</h1>
+      <p class="lede">Which AI powers <span class="cn">luna</span>. Your Claude account works with no API key.</p>
+      <div class="card" id="providers"></div>
+      <div class="card hidden" id="provCfg" style="margin-top:12px">
+        <div class="row" id="keyRow"><div class="txt"><div class="t">API key</div><div class="d" id="keyHint">Saved in your Mac's keychain.</div></div><input type="password" id="apiKey" placeholder="paste key" style="width:220px"><button class="btn" id="saveKey">Save</button></div>
+        <div class="row" id="urlRow"><div class="txt"><div class="t">API address</div></div><input type="text" id="baseURL" style="width:280px"></div>
+        <div class="row"><div class="txt"><div class="t">Model</div></div><select id="modelSel" style="max-width:280px"></select><button class="btn" id="loadModels">Refresh</button></div>
+      </div>
+      <div class="card" id="claudeCfg" style="margin-top:12px">
+        <div class="row"><div class="txt"><div class="t">Claude model</div><div class="d">Sonnet is fast and smart. Opus for big jobs. Uses your plan's limits.</div></div><div class="seg" id="claudeModel"><button data-v="haiku">Haiku</button><button data-v="sonnet">Sonnet</button><button data-v="opus">Opus</button></div></div>
+      </div>
+      <div class="card" style="margin-top:12px"><div class="row"><div class="txt"><div class="t">Speed</div><div class="d">Fast answers right away. Thorough thinks longer before doing big jobs.</div></div><div class="seg" id="effort"><button data-v="low">Fast</button><button data-v="medium">Balanced</button><button data-v="high">Thorough</button></div></div></div>
+      <div class="btns" style="margin-top:12px"><button class="btn" id="test">Test the brain</button><span class="status" id="testOut"></span></div>
+    </section>
+
+    <!-- CONNECTIONS -->
+    <section class="page" id="connections">
+      <h1>Connections</h1>
+      <p class="lede">Ways <span class="cn">luna</span> does things for you in the background, without typing on your screen.</p>
+      <h2>WhatsApp</h2>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">WhatsApp</div><div class="d" id="waDesc">Link once and she can send messages and files, read chats and tell you when someone texts, all in the background.</div></div><span class="pill off" id="waPill">not linked</span></div>
+        <div class="row stack hidden" id="waQrRow"><div class="d">On your phone: WhatsApp → Settings → Linked devices → Link a device, then scan this.</div><div class="check" style="height:300px"><img id="waQr" style="width:260px;height:260px;border-radius:8px;background:#fff"></div></div>
+        <div class="row"><div class="btns"><button class="btn primary" id="waLink">Link WhatsApp</button><button class="btn danger hidden" id="waUnlink">Unlink</button></div></div>
+        <div class="row"><div class="txt"><div class="t">Tell me when someone messages</div></div><div class="seg" id="waNotify"><button data-v="direct">Direct chats</button><button data-v="all">Everything</button><button data-v="off">Off</button></div></div>
+      </div>
+      <p class="note">Heads up: this uses WhatsApp's linked-device feature through an unofficial library (the same way many WhatsApp tools work). It's your own account and you can unlink any time, but WhatsApp doesn't officially support it, so there's a small risk they flag the account.</p>
+      <h2>Mac apps (no setup)</h2>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">iMessage and SMS</div><div class="d">Sends through the Messages app in the background, files too.</div></div><span class="pill">ready</span></div>
+        <div class="row"><div class="txt"><div class="t">Email with attachments</div><div class="d">Sends through the Mail app, hidden. Needs your email added in Mail once.</div></div><span class="pill">ready</span></div>
+        <div class="row"><div class="txt"><div class="t">Files</div><div class="d">Finds any document on your Mac by name so she can send it anywhere.</div></div><span class="pill">ready</span></div>
+        <div class="row"><div class="txt"><div class="t">Contacts</div><div class="d">Looks up numbers and emails in your Contacts app.</div></div><span class="pill">ready</span></div>
+      </div>
+      <h2>Websites (Messenger, Instagram, anything)</h2>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">Work in a hidden browser</div><div class="d">Her own browser runs invisibly. Turn this off when you need to log in to a site once, then turn it back on.</div></div><label class="toggle"><input type="checkbox" id="bgBrowser"><span></span></label></div>
+        <div class="row"><div class="txt"><div class="t">Your Claude connectors</div><div class="d">Gmail, Calendar, Drive, Notion and the others you connected in Claude work here automatically.</div></div><span class="pill" id="connCount"></span></div>
+      </div>
+    </section>
+
+    <!-- MEMORY -->
+    <section class="page" id="memory">
+      <h1>Memory</h1>
+      <p class="lede">What <span class="cn">luna</span> knows about you. Plain files you can read and edit.</p>
+      <div class="card list" id="memList"></div>
+      <div class="card hidden" id="memEdit" style="margin-top:12px"><div class="row stack"><b id="memPath"></b><textarea class="code" id="memText"></textarea><div class="btns"><button class="btn primary" id="memSave">Save</button><button class="btn" id="memClose">Close</button><button class="btn danger" id="memDel">Delete file</button></div></div></div>
+      <h2>Bring in memory from another AI</h2>
+      <div class="card"><div class="row stack"><div class="d">In Claude or ChatGPT, ask "write everything you remember about me as a list", then paste it here.</div>
+        <div class="btns"><select id="impFrom"><option>Claude</option><option>ChatGPT</option><option>Gemini</option><option>Other</option></select></div>
+        <textarea id="impText" placeholder="paste here"></textarea><div class="btns"><button class="btn" id="impGo">Import</button><span class="note" id="impOut"></span></div></div></div>
+      <h2>Forget something</h2>
+      <div class="card"><div class="row"><input type="text" id="forget" placeholder="e.g. my old address" style="flex:1"><button class="btn danger" id="forgetGo">Forget</button></div><div class="row"><span class="note" id="forgetOut"></span></div></div>
+    </section>
+
+    <!-- ROUTINES -->
+    <section class="page" id="routines">
+      <h1>Routines</h1>
+      <p class="lede">Things <span class="cn">luna</span> does on a schedule. You can also just tell her in chat.</p>
+      <div class="card list" id="routineList"></div>
+      <h2>Add a routine</h2>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">When</div><div class="d">e.g. "daily 07:30", "weekdays 09:00", "every 3h"</div></div><input type="text" id="rWhen" placeholder="daily 07:30"></div>
+        <div class="row"><div class="txt"><div class="t">Title</div></div><input type="text" id="rTitle" placeholder="morning brief"></div>
+        <div class="row stack"><textarea id="rWhat" placeholder="what should she do?"></textarea><div class="btns"><button class="btn primary" id="rAdd">Add</button></div></div>
+      </div>
+      <h2>Running now</h2>
+      <div class="card list" id="jobList"></div>
+    </section>
+
+    <!-- ACTIVITY -->
+    <section class="page" id="activity">
+      <h1>Activity</h1>
+      <p class="lede">Every action <span class="cn">luna</span> took, newest first. Risky ones (money, deleting, posting, sharing) always ask you first.</p>
+      <div class="card"><div class="log" id="actLog"></div></div>
+    </section>
+
+    <!-- MAC ACCESS -->
+    <section class="page" id="mac">
+      <h1>Mac access</h1>
+      <p class="lede">Turn these on for Electron (and Terminal) so she can work in your apps.</p>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">Accessibility</div><div class="d">Typing and clicking in apps.</div></div><button class="btn" data-pane="accessibility">Open</button></div>
+        <div class="row"><div class="txt"><div class="t">Automation</div><div class="d">Controlling apps like WhatsApp and Notes.</div></div><button class="btn" data-pane="automation">Open</button></div>
+        <div class="row"><div class="txt"><div class="t">Screen Recording</div><div class="d">Seeing the screen to check her work.</div></div><button class="btn" data-pane="screen">Open</button></div>
+        <div class="row"><div class="txt"><div class="t">Microphone</div><div class="d">Voice typing.</div></div><button class="btn" data-pane="mic">Open</button></div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="page" id="about">
+      <h1>About</h1>
+      <div class="card">
+        <div class="row"><div class="txt"><div class="t">Version</div></div><span id="aboutVer"></span></div>
+        <div class="row"><div class="txt"><div class="t">Her folder</div><div class="d" id="aboutFolder"></div></div><button class="btn" data-pane="folder">Show</button></div>
+        <div class="row"><div class="txt"><div class="t">Time zone</div></div><span id="aboutTz"></span></div>
+        <div class="row"><div class="txt"><div class="t">Quit</div></div><button class="btn danger" id="quit">Quit</button></div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="vendor/three.min.js"></script>
+<script src="vendor/GLTFLoader.js"></script>
+<script src="buddy-core.js"></script>
+<script src="settings.js"></script>
+</body>
+</html>

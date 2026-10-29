@@ -1,0 +1,19 @@
+{
+  "name": "luna",
+  "version": "3.0.0",
+  "description": "Luna: a personal AI agent that lives on your Mac desktop as a little character. Runs on your own Claude account, no API key.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "setup": "bash install.sh"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0"
+  },
+  "dependencies": {
+    "baileys": "7.0.0-rc14",
+    "qrcode": "^1.5.4"
+  },
+  "license": "MIT"
+}

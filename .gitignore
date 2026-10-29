@@ -1,0 +1,20 @@
+# everything personal stays on your Mac, never in git
+me/
+notes.md
+outputs/
+characters/
+browser-profile/
+.whatsapp/
+.luna-prefs.json
+.mcp.json
+luna.log
+tools/.luna-api.json
+tools/.sentinel-trust
+tools/desktop-mcp.json
+tools/browser-mcp.json
+tools/sentinel-settings.json
+tools/screen.png
+node_modules/
+*.v[0-9]*.js
+index.v1.html
+.DS_Store

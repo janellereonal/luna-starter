@@ -1,0 +1,61 @@
+# Luna 🦎
+
+A personal AI agent that lives on your Mac desktop as a little character. She walks around your screen, you tap her to chat, and she actually does things for you: plans your day, checks your deadlines and messages, sends texts and files, runs routines, and taps you when something matters.
+
+Luna runs on **your own Claude account** (Pro or Max) through Claude Code. No API key, no extra cost.
+
+## What she can do
+
+- **Knows you.** Brings over what your Claude account remembers about you, reads your Claude Code notes, can learn from your past Claude chats, and keeps learning as you talk.
+- **Uses your stuff.** Every app you connected on claude.ai (Gmail, Calendar, Drive, Notion, Slack...) and every tool you added to the Claude desktop app (like Canvas) works automatically.
+- **Does the work in the background.** WhatsApp (link once with a QR), iMessage and SMS, email with attachments, finding any file on your Mac and sending it, your calendar, your browser. Nothing types on your screen.
+- **Plans with you.** Your day shows up as an agenda card, to-dos as a checklist, files as tap-to-open chips.
+- **Proactive.** Check-ins, routines ("every weekday at 7:30, brief me"), deadline radar, a tap when someone messages you.
+- **Safe.** An independent checker (Sentinel) asks before anything risky: payments, deleting, posting publicly, sharing files, bulk sends. Every action is logged.
+- **Make her yours.** Pick any picture or GIF and she scans it, finds the face, eyes, mouth, arms and legs, and brings it to life (blinks, talks, walks, waves, dances). Or a 3D model (.glb).
+- **Claude-style app.** Light and dark mode, a full-screen window, a little chat by your character, voice typing.
+
+## Install (Mac)
+
+You need: a Mac, a Claude Pro or Max plan, and [Node.js 20+](https://nodejs.org).
+
+```bash
+git clone https://github.com/janellereonal/luna-starter ~/Documents/luna
+cd ~/Documents/luna && bash install.sh
+```
+
+The installer adds Claude Code if you don't have it, signs you in to Claude, and starts Luna.
+
+## First run
+
+Luna opens **Get started**:
+
+1. **Your name.**
+2. **Your Claude.** She checks you're signed in and lists the apps and tools she found.
+3. **Your memory.**
+   - Claude Code notes on your Mac sync on their own.
+   - **Bring my Claude memory**: she opens Claude with the question ready; press enter and copy the answer. She catches it from your clipboard.
+   - **Put me inside the Claude app**: adds Luna's tools to the Claude desktop app, so in any Claude chat you can say *"save everything you remember about me to luna"* or *"remind me every morning through luna"*.
+   - **Learn from your past Claude chats**: drop in your Claude data export (Claude → Settings → Privacy → Export data).
+4. **Let me get to know you.** A read-only look through your memory, calendar, email, school/work apps, chats and recent files. She writes down who you are, your people, deadlines and projects.
+5. **Make me yours.** Character, WhatsApp, Mac permissions.
+
+Why not fully automatic for memory? Claude doesn't offer a way for other apps to read your Claude memory, so Luna uses the official routes above (they take a few seconds).
+
+## Mac permissions
+
+For Luna to work in your apps, allow **Electron** (and Terminal) in System Settings → Privacy & Security: Accessibility, Automation, Screen Recording. Settings → Mac access in Luna has shortcuts.
+
+## Privacy
+
+Everything Luna knows lives in the `me/` folder on your Mac, in plain text you can read and edit (Settings → Memory). Nothing personal is in this repo (see `.gitignore`). Your messages go only to your own Claude account and the apps you connected.
+
+WhatsApp: Luna links as a linked device using an unofficial library. It's your own account and you can unlink any time, but WhatsApp doesn't officially support it.
+
+## Other AI models
+
+Prefer GPT, Gemini, OpenRouter or a local model (Ollama)? Settings → Brain. Claude gets the most features.
+
+## License
+
+MIT

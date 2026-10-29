@@ -1,0 +1,191 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:">
+<title>Luna</title>
+<style>
+  /* themes: luna (warm) or claude-style, each in light and dark. dark follows the mac unless set in settings. */
+  :root {
+    --card: #FFFCF4; --fg: #2B2A22; --muted: #7A7462; --line: #EADFC4; --me: #F6D77A; --luna: #F1EBDC; --accent: #3E7B4F;
+    --field: #fff; --hover: #EFE8D6; --warnbg: #FFF6E0; --meText: var(--fg); --fs: 13.5px;
+    --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, sans-serif; --replyFont: var(--font);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --card: #23221D; --fg: #ECE7DA; --muted: #A39E8F; --line: #3A372F; --me: #5C4E1E; --luna: #2E2C25; --accent: #6DBA80; --field: #1B1A16; --hover: #34312A; --warnbg: #3A3020; }
+  }
+  :root[data-style="claude"] { --card: #FAF9F5; --fg: #141413; --muted: #73726C; --line: #E5E3DA; --me: #F0EEE6; --luna: transparent; --accent: #C96442; --field: #fff; --hover: #EFEDE5; --warnbg: #FBF1E6;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; --replyFont: "Iowan Old Style", "Charter", Georgia, serif; }
+  @media (prefers-color-scheme: dark) {
+    :root[data-style="claude"] { --card: #262624; --fg: #F5F4EE; --muted: #A6A39A; --line: #3B3A36; --me: #141413; --luna: transparent; --accent: #D97757; --field: #30302E; --hover: #34332F; --warnbg: #3A2F25; }
+  }
+  :root[data-font="system"] { --font: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; --replyFont: var(--font); }
+  :root[data-font="serif"] { --replyFont: "Iowan Old Style", Georgia, serif; }
+  :root[data-font="readable"] { --font: Verdana, Tahoma, sans-serif; --replyFont: var(--font); }
+  :root[data-font="readable"] .msg { letter-spacing: 0.02em; word-spacing: 0.08em; line-height: 1.65; }
+  :root[data-style="claude"] .msg.luna { padding-left: 2px; }
+  :root[data-style="claude"] #chat { border-radius: 16px; }
+  .msg.luna { font-family: var(--replyFont); }
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font-family: var(--font); color: var(--fg); }
+  #pet { position: absolute; left: 0; top: 0; width: 440px; height: 440px; }
+  #pet canvas { display: block; width: 100%; height: 100%; }
+  .bubble {
+    position: absolute; left: 0; top: 0; transform: translate(-50%, -100%);
+    background: var(--card); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 16px; padding: 7px 13px; font-weight: 700; font-size: 14px;
+    white-space: nowrap; pointer-events: none; box-shadow: 0 6px 18px rgba(40, 30, 10, 0.18);
+  }
+  .bubble::after {
+    content: ""; position: absolute; left: 50%; bottom: -7px; width: 12px; height: 12px;
+    background: var(--card); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    transform: translateX(-50%) rotate(45deg);
+  }
+  #chat {
+    position: absolute; top: 0; width: 340px; max-height: 330px;
+    display: flex; flex-direction: column; background: var(--card);
+    border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 12px 34px rgba(40, 30, 10, 0.25);
+    overflow: hidden;
+  }
+  #chat[hidden] { display: none; }
+  .head { display: flex; align-items: center; gap: 10px; padding: 9px 10px 8px 12px; border-bottom: 1px solid var(--line); }
+  .head .title { flex: 1; font-size: 14px; display: flex; gap: 5px; align-items: center; }
+  .head b { font-size: 15px; }
+  /* mac-style traffic lights: symbols show when you hover the group, like macOS */
+  .lights { display: flex; gap: 8px; }
+  .l { width: 12px; height: 12px; border-radius: 50%; border: 0.5px solid rgba(0,0,0,0.15); padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .l span { font: 700 10px/1 -apple-system, system-ui, sans-serif; color: rgba(0,0,0,0.55); opacity: 0; margin-top: -1px; }
+  .lights:hover .l span { opacity: 1; }
+  .red { background: #FF5F57; } .yellow { background: #FEBC2E; } .green { background: #28C840; }
+  .head .icon { border: 0; background: transparent; color: var(--muted); cursor: pointer; border-radius: 6px; padding: 4px; display: flex; }
+  .head .icon:hover { background: var(--hover); color: var(--fg); }
+  /* green = full screen, like a mac window: a calm claude-style layout with a centered column */
+  #chat.full { left: 0 !important; top: 0 !important; width: 100vw; height: 100vh; max-height: none; border-radius: 0; border: 0; box-shadow: none; z-index: 5; }
+  #chat.full .head { padding: 12px 16px; }
+  #chat.full #log, #chat.full .chips, #chat.full form, #chat.full #mictip { width: min(760px, calc(100% - 48px)); margin: 0 auto; box-sizing: border-box; }
+  #chat.full #log { padding: 24px 4px; gap: 10px; }
+  #chat.full .msg { font-size: 15.5px; line-height: 1.6; max-width: 100%; }
+  #chat.full .msg.luna { background: transparent; padding-left: 0; }
+  #chat.full .msg.me { max-width: 75%; }
+  #chat.full form { border: 1px solid var(--line); border-radius: 22px; margin-bottom: 22px; padding: 10px; background: var(--field); box-shadow: 0 4px 18px rgba(40,30,10,0.07); }
+  #chat.full form input { border: 0; font-size: 15.5px; }
+  #chat.full .chips { justify-content: center; padding-bottom: 12px; }
+  #hello { text-align: center; padding: 18vh 20px 0; }
+  #hello[hidden] { display: none; }
+  #hello .hi-icon { font-size: 38px; }
+  #hello h1 { font: 600 30px/1.2 Georgia, "Iowan Old Style", serif; margin: 10px 0 6px; color: var(--fg); }
+  #hello p { color: var(--muted); margin: 0; }
+  /* yellow = minimize to a little pill near the character */
+  #pill { position: absolute; display: flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font: 700 13px var(--font); color: var(--fg); cursor: pointer; box-shadow: 0 6px 18px rgba(40,30,10,0.18); }
+  #pill[hidden] { display: none; }
+  #pill:hover { background: var(--field); }
+  #pill i { width: 8px; height: 8px; border-radius: 50%; background: #E5533D; }
+  #log { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-height: 60px; }
+  .msg { max-width: 85%; padding: 7px 11px; border-radius: 14px; font-size: var(--fs); line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
+  .msg.me { align-self: flex-end; background: var(--me); color: var(--meText); border-bottom-right-radius: 4px; }
+  .msg.luna { align-self: flex-start; background: var(--luna); border-bottom-left-radius: 4px; }
+  .msg.wait { color: var(--muted); font-style: italic; }
+  .acts { display: flex; flex-wrap: wrap; gap: 6px; align-self: flex-start; max-width: 92%; }
+  .acts button { font: 700 12px var(--font); border: 1px solid var(--accent); color: var(--accent); background: var(--field); border-radius: 999px; padding: 5px 10px; cursor: pointer; }
+  .acts button:hover { background: var(--accent); color: #fff; }
+  #mic.on { background: var(--warnbg); }
+  .acts button:disabled { opacity: 0.45; cursor: default; }
+  .msg.nudge { border: 1px dashed var(--accent); }
+  .approval { align-self: stretch; border: 2px solid #E0A33B; background: var(--warnbg); border-radius: 14px; padding: 9px 11px; font-size: 13px; }
+  .approval b { display: block; margin-bottom: 4px; }
+  .approval .why { color: var(--muted); font-size: 12px; margin-bottom: 7px; }
+  .approval button { font: 700 12px var(--font); border-radius: 999px; padding: 5px 12px; cursor: pointer; margin-right: 6px; border: 1px solid var(--accent); }
+  .approval .yes { background: var(--accent); color: #fff; }
+  .approval .no { background: var(--field); color: var(--fg); border-color: var(--line); }
+  form button.stop { background: #B9543F; }
+  form input { min-width: 0; }
+  form button { flex-shrink: 0; }
+  #mic { background: var(--field); border: 1px solid var(--line); color: var(--muted); padding: 0 9px; display: flex; align-items: center; justify-content: center; }
+  #mic:hover { color: var(--fg); background: var(--hover); }
+  #mic.on { background: #FFE3DD; border-color: #B9543F; color: #B9543F; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(185, 84, 63, 0.18); } }
+  #mictip { font-size: 11.5px; color: var(--muted); padding: 0 12px 8px; }
+  .tools { display: flex; gap: 2px; margin: -2px 0 2px 4px; align-self: flex-start; }
+  .tools button { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 6px; display: flex; }
+  .tools button:hover { background: var(--hover); color: var(--fg); }
+  .tools button.on { color: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
+  .chips[hidden] { display: none; }
+  .chips button { font: 600 12px var(--font); border: 1px solid var(--line); background: var(--field); border-radius: 999px; padding: 5px 10px; cursor: pointer; color: var(--fg); }
+  .chips button:hover { background: var(--me); }
+
+  /* her own window (green button): a normal mac window with the chat filling it */
+  html.standalone, html.standalone body { background: var(--card); }
+  html.standalone #pet, html.standalone #pill, html.standalone .lights { display: none !important; }
+  html.standalone #chat { position: fixed; inset: 0; width: auto; height: auto; max-height: none; border: 0; border-radius: 0; box-shadow: none; }
+  html.standalone #chat .head { padding: 12px 16px 10px 84px; -webkit-app-region: drag; }
+  html.standalone #chat .head button { -webkit-app-region: no-drag; }
+  /* friendly formatting in luna's replies */
+  .msg.md { white-space: normal; }
+  .msg.md p { margin: 0 0 6px; } .msg.md p:last-child { margin-bottom: 0; }
+  .msg.md h3, .msg.md h4, .msg.md h5, .msg.md h6 { margin: 8px 0 4px; font-size: 1.02em; }
+  .msg.md ul, .msg.md ol { margin: 2px 0 6px; padding-left: 20px; } .msg.md li { margin: 2px 0; }
+  .msg.md li.check { list-style: none; margin-left: -18px; display: flex; gap: 7px; align-items: baseline; }
+  .msg.md li.check .box { width: 14px; height: 14px; border: 1.5px solid var(--muted); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; transform: translateY(2px); }
+  .msg.md li.check.done { color: var(--muted); text-decoration: line-through; } .msg.md li.check.done .box { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .msg.md code { font: 0.9em ui-monospace, Menlo, monospace; background: var(--hover); padding: 1px 5px; border-radius: 5px; }
+  .msg.md pre { background: var(--hover); padding: 8px 10px; border-radius: 10px; overflow-x: auto; margin: 6px 0; } .msg.md pre code { background: none; padding: 0; }
+  .msg.md a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+  .msg.md blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); }
+  .msg.md hr { border: 0; border-top: 1px solid var(--line); margin: 8px 0; }
+  .msg.md .tablewrap { overflow-x: auto; margin: 6px 0; }
+  .msg.md table { border-collapse: collapse; font-size: 0.93em; min-width: 100%; }
+  .msg.md th, .msg.md td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; } .msg.md th { background: var(--hover); }
+  .msg.md .card { background: var(--field); border: 1px solid var(--line); border-radius: 14px; padding: 6px 0; margin: 6px 0; font-family: var(--font); }
+  .msg.md .card-h { font-weight: 700; padding: 4px 12px 6px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
+  .msg.md .ag-row { display: flex; gap: 10px; padding: 6px 12px; position: relative; }
+  .msg.md .ag-row + .ag-row { border-top: 1px dashed var(--line); }
+  .msg.md .ag-time { min-width: 92px; white-space: nowrap; flex-shrink: 0; color: var(--muted); font-size: 0.9em; font-variant-numeric: tabular-nums; padding-top: 1px; }
+  .msg.md .ag-what { font-weight: 600; } .msg.md .ag-where { color: var(--muted); font-size: 0.9em; }
+  .msg.md .ag-row.past { opacity: 0.5; }
+  .msg.md .ag-row.now { background: color-mix(in srgb, var(--accent) 12%, transparent); } .msg.md .ag-row.now::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--accent); }
+  .msg.md .ag-row.imp .ag-what::after { content: " ⚑"; color: #E5533D; }
+  .msg.md .task { display: flex; gap: 8px; align-items: center; padding: 5px 12px; cursor: pointer; }
+  .msg.md .task input { flex: 0 0 auto; accent-color: var(--accent); width: 15px; height: 15px; margin: 0; padding: 0; border: 0; }
+  .msg.md .task span { flex: 1; text-align: left; }
+  .msg.md .task em { margin-left: auto; color: var(--muted); font-size: 0.88em; font-style: normal; white-space: nowrap; padding-left: 8px; }
+  .msg.md .task.done span { text-decoration: line-through; color: var(--muted); }
+  .msg.md .files { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .msg.md .file { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--field); color: var(--fg); border-radius: 10px; padding: 6px 10px; font: 600 12.5px var(--font); cursor: pointer; max-width: 100%; }
+  .msg.md .file:hover { background: var(--hover); } .msg.md .file .fn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  #chat.full .msg.md .card { max-width: 560px; }
+  form { display: flex; gap: 6px; padding: 8px 10px 10px; border-top: 1px solid var(--line); }
+  input { flex: 1; font: 14px var(--font); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; outline: none; background: var(--field); color: var(--fg); }
+  input:focus { border-color: var(--accent); }
+  form button { font: 700 13px var(--font); border: 0; border-radius: 12px; padding: 0 12px; background: var(--accent); color: #fff; cursor: pointer; }
+  form button:disabled { opacity: 0.5; cursor: default; }
+</style>
+</head>
+<body>
+  <div id="pet">
+    <canvas id="c" aria-label="Luna the gecko"></canvas>
+    <div class="bubble" id="bubble" hidden></div>
+  </div>
+
+  <div id="chat" hidden>
+    <div class="head"><div class="lights"><button id="close" class="l red" title="close"><span>×</span></button><button id="min" class="l yellow" title="minimize"><span>−</span></button><button id="full" class="l green" title="enter full screen"><span><svg width="7" height="7" viewBox="0 0 10 10"><path d="M1 4V1h3M9 6v3H6" fill="none" stroke="rgba(0,0,0,.6)" stroke-width="1.6"/></svg></span></button></div><span class="title"><span id="charIcon">🦎</span> <b id="charName">luna</b></span><button id="settings" class="icon" title="settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button><button id="reset" class="icon" title="new chat"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button></div>
+    <div id="hello" hidden><div class="hi-icon" id="helloIcon">🦎</div><h1 id="helloText">good evening</h1><p>ask anything, or tell me what to do.</p></div>
+    <div id="log"></div>
+    <div class="chips">
+      <button data-q="plan my day pls">plan my day</button>
+      <button data-q="what's due this week?">what's due</button>
+      <button data-q="how am i doing on my goals?">my goals</button>
+    </div>
+    <form id="f"><button type="button" id="mic" title="talk instead of typing"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 10.5a7 7 0 0 0 14 0"/><path d="M12 17.5v3.5"/></svg></button><input id="q" placeholder="talk to luna..." autocomplete="off"><button id="send">send</button></form>
+    <div id="mictip" hidden>listening… hold <b>fn</b> to talk with Wispr Flow (or press fn twice for Mac dictation). it sends when you stop.</div>
+  </div>
+  <button id="pill" hidden><span id="pillIcon">🦎</span> <span id="pillText">luna</span><i id="pillDot" hidden></i></button>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/GLTFLoader.js"></script>
+  <script src="buddy-core.js"></script>
+  <script src="renderer.js"></script>
+  <script src="md.js"></script>
+  <script src="chat.js"></script>
+  <script src="buddy.js"></script>
+</body>
+</html>
