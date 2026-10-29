@@ -1137,6 +1137,18 @@ function importCharacter(file) {
   savePrefs(); send('character', characterInfo());
   return stem.replace(/-/g, ' ');
 }
+ipcMain.handle('char:rename', (_e, id, name) => {
+  if (!charId(id)) return { error: "couldn't find that character" };
+  const stem = id.replace(/\.(png|glb)$/, ''), main = id.slice(stem.length);
+  const base = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+  if (!base) return { error: 'use at least one letter or number in the name' };
+  if (base === stem) return settingsState();
+  let next = base, i = 2;
+  while (PACK_PARTS.some((ext) => fs.existsSync(path.join(CHARS, next + ext)))) next = `${base}-${i++}`;
+  for (const ext of PACK_PARTS) { const f = path.join(CHARS, stem + ext); if (fs.existsSync(f)) fs.renameSync(f, path.join(CHARS, next + ext)); }
+  if ((prefs.character || {}).file === id) { prefs.character = { ...prefs.character, file: next + main, name: next.replace(/-/g, ' ') }; savePrefs(); send('character', characterInfo()); }
+  return settingsState();
+});
 ipcMain.handle('char:export', async (_e, id) => {
   try {
     const data = exportCharacter(id);

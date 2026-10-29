@@ -152,7 +152,7 @@
     $('scanner').classList.remove('hidden'); $('rigBox').parentElement.classList.remove('hidden');
     $('partBtns').classList.remove('hidden'); $('scanHelp').classList.remove('hidden');
     $('scanTitle').textContent = o.id ? `Edit ${o.name}` : 'New character';
-    $('newName').value = o.name || ''; delete $('newName').dataset.touched; $('newName').disabled = Boolean(o.id);
+    $('newName').value = o.name || ''; delete $('newName').dataset.touched; $('newName').disabled = false;
     $('saveChar').disabled = false; $('rescan').disabled = false;
     status(o.id ? summary(ed.rig) : '');
     const rc = $('rigCv'); const k = Math.min(290 / ed.cv.height, 300 / ed.cv.width) * 2; // drawn at 2x for sharpness
@@ -302,7 +302,10 @@
     if (ed.kind === '3d') {
       let thumb = ''; try { thumb = liveBuddy.snapshot(); } catch (_) {}
       st = await S.charSave(name, { kind: '3d', glb: ed.glb, thumb, info: { clips: (ed.info || {}).clips || [] } });
-    } else if (ed.id) st = await S.charRig(ed.id, ed.rig, ed.back);
+    } else if (ed.id) {
+      st = await S.charRig(ed.id, ed.rig, ed.back);
+      if (name !== ed.name) { const r = await S.charRename(ed.id, name); if (r && r.error) alert(r.error); else if (r) st = r; }
+    }
     else st = await S.charSave(name, { kind: 'image', png: ed.cv.toDataURL('image/png'), rig: ed.rig, anim: ed.frames ? { strip: BuddyCore.toStrip(ed.frames), n: ed.frames.length, delays: ed.delays } : undefined });
     closeEditor(); renderChars();
   };

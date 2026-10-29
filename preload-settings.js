@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('S', {
   memRead: inv('memory:read'), memWrite: inv('memory:write'), memDelete: inv('memory:delete'), memImport: inv('memory:import'), memForget: inv('memory:forget'),
   routineAdd: inv('routine:add'), routineRemove: inv('routine:remove'), routineRun: inv('routine:run'), jobStop: inv('job:stop'), watchStop: inv('watch:stop'), checkin: inv('checkin:now'),
   activity: inv('activity:get'),
-  charPick: inv('char:pick'), charScan: inv('char:scan'), charRig: inv('char:rig'), charSave: inv('char:save'), charUse: inv('char:use'), charDelete: inv('char:delete'), charExport: inv('char:export'),
+  charPick: inv('char:pick'), charScan: inv('char:scan'), charRig: inv('char:rig'), charSave: inv('char:save'), charUse: inv('char:use'), charDelete: inv('char:delete'), charExport: inv('char:export'), charRename: inv('char:rename'),
   open: inv('open:pane'), action: inv('app:action'),
   onGo: (fn) => ipcRenderer.on('settings:go', (_e, s) => fn(s)),
   onJobs: (fn) => ipcRenderer.on('jobs', (_e, j) => fn(j)),
